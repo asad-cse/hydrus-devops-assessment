@@ -1,0 +1,35 @@
+# Image gulo build + push korte hobe — eta Task 4 (CI/CD)-e automated, kintu manually korle:
+ACR_LOGIN=$(terraform -chdir=terraform output -raw acr_login_server)
+az acr login --name ${ACR_LOGIN%%.*}
+
+docker build -t $ACR_LOGIN/hydrus-backend:v1 ./backend
+docker build --build-arg VITE_API_BASE_URL=http://hydrus.<INGRESS_IP>.nip.io -t $ACR_LOGIN/hydrus-frontend:v1 ./frontend
+docker push $ACR_LOGIN/hydrus-backend:v1
+docker push $ACR_LOGIN/hydrus-frontend:v1
+
+# Manifests- image path replace backend-deployment.yaml and frontend-deployment.yaml)
+sed -i "s|REPLACE_ACR_LOGIN_SERVER|$ACR_LOGIN|g" k8s/backend-deployment.yaml
+sed -i "s|REPLACE_ACR_LOGIN_SERVER|$ACR_LOGIN|g" k8s/frontend-deployment.yaml
+sed -i "s|:latest|:v1|g" k8s/backend-deployment.yaml k8s/frontend-deployment.yaml
+
+# Apply
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/configmap.yaml
+
+kubectl create secret generic backend-secret \
+    -n hydrus \
+    --from-literal=DB_USER=hydrus \
+    --from-literal=DB_PASSWORD='YourStrongPass!' \
+    --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl apply -f k8s/postgres.yaml
+kubectl apply -f k8s/backend-deployment.yaml
+kubectl apply -f k8s/frontend-deployment.yaml
+kubectl apply -f k8s/services.yaml
+kubectl apply -f k8s/ingress.yaml
+kubectl apply -f k8s/hpa.yaml
+
+# Verify
+kubectl get all -n hydrus
+kubectl get ingress -n hydrus
+kubectl get hpa -n hydrus

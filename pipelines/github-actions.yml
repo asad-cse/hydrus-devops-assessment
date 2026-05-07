@@ -1,0 +1,154 @@
+name: Build and Deploy to AKS
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  # ============= Build & Push =============
+  build-and-push:
+    name: Build and push images
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    outputs:
+      image_tag: ${{ env.IMAGE_TAG }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: ACR Login
+        run: |
+          ACR_NAME="${{ secrets.ACR_LOGIN_SERVER }}"
+          ACR_NAME="${ACR_NAME%%.*}"
+          az acr login --name "$ACR_NAME"
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ secrets.ACR_LOGIN_SERVER }}/hydrus-backend:${{ env.IMAGE_TAG }}
+            ${{ secrets.ACR_LOGIN_SERVER }}/hydrus-backend:latest
+          cache-from: type=registry,ref=${{ secrets.ACR_LOGIN_SERVER }}/hydrus-backend:cache
+          cache-to: type=registry,ref=${{ secrets.ACR_LOGIN_SERVER }}/hydrus-backend:cache,mode=max
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          build-args: |
+            VITE_API_BASE_URL=https://${{ secrets.INGRESS_HOST }}
+          tags: |
+            ${{ secrets.ACR_LOGIN_SERVER }}/hydrus-frontend:${{ env.IMAGE_TAG }}
+            ${{ secrets.ACR_LOGIN_SERVER }}/hydrus-frontend:latest
+
+      # Bonus: vulnerability scan
+      - name: Scan backend image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ secrets.ACR_LOGIN_SERVER }}/hydrus-backend:${{ env.IMAGE_TAG }}
+          format: table
+          exit-code: 0      # production- You can block production with 1.
+          severity: CRITICAL,HIGH
+
+  # ============= Deploy =============
+  deploy:
+    name: Deploy to AKS
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set up kubelogin + kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
+            --name ${{ secrets.AKS_CLUSTER_NAME }} \
+            --overwrite-existing
+
+      - name: Apply namespace + config
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/configmap.yaml
+
+      - name: Apply secret (from GitHub Secrets)
+        run: |
+          kubectl create secret generic backend-secret \
+            -n hydrus \
+            --from-literal=DB_USER='${{ secrets.BACKEND_DB_USER }}' \
+            --from-literal=DB_PASSWORD='${{ secrets.BACKEND_DB_PASSWORD }}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply postgres + services + ingress + hpa
+        run: |
+          kubectl apply -f k8s/postgres.yaml
+          kubectl apply -f k8s/services.yaml
+          kubectl apply -f k8s/ingress.yaml
+          kubectl apply -f k8s/hpa.yaml
+
+      - name: Update image tags in deployments
+        run: |
+          sed -i "s|REPLACE_ACR_LOGIN_SERVER|${{ secrets.ACR_LOGIN_SERVER }}|g" \
+            k8s/backend-deployment.yaml k8s/frontend-deployment.yaml
+          sed -i "s|:latest|:${{ env.IMAGE_TAG }}|g" \
+            k8s/backend-deployment.yaml k8s/frontend-deployment.yaml
+
+      - name: Deploy backend + frontend
+        run: |
+          kubectl apply -f k8s/backend-deployment.yaml
+          kubectl apply -f k8s/frontend-deployment.yaml
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/backend -n hydrus --timeout=300s
+          kubectl rollout status deployment/frontend -n hydrus --timeout=300s
+
+      # Smoke test (Bonus)
+      - name: Smoke test
+        run: |
+          INGRESS_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller \
+            -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          echo "Ingress IP: $INGRESS_IP"
+          for i in {1..10}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: ${{ secrets.INGRESS_HOST }}" \
+              http://$INGRESS_IP/health)
+            echo "Attempt $i: $STATUS"
+            [ "$STATUS" = "200" ] && exit 0
+            sleep 6
+          done
+          echo "Smoke test failed"
+          exit 1
+
+      # Rollback on failure
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Deployment failed — rolling back"
+          kubectl rollout undo deployment/backend -n hydrus
+          kubectl rollout undo deployment/frontend -n hydrus
