@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1360" height="1160" viewBox="0 0 680 580">
+  <title>Hydrus AKS Architecture</title>
+  <desc>End-to-end architecture for the Hydrus platform.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      .t-th { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 14px; font-weight: 500; }
+      .t-ts { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 12px; font-weight: 400; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="680" height="580" fill="#FFFFFF"/>
+
+  <!-- User -->
+  <ellipse cx="80" cy="55" rx="40" ry="22" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text class="t-th" fill="#2C2C2A" x="80" y="55" text-anchor="middle" dominant-baseline="central">User</text>
+
+  <!-- DNS -->
+  <rect x="150" y="33" width="80" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text class="t-th" fill="#2C2C2A" x="190" y="55" text-anchor="middle" dominant-baseline="central">DNS</text>
+
+  <!-- NGINX Ingress -->
+  <rect x="260" y="22" width="170" height="64" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text class="t-th" fill="#0C447C" x="345" y="46" text-anchor="middle" dominant-baseline="central">NGINX Ingress</text>
+  <text class="t-ts" fill="#185FA5" x="345" y="66" text-anchor="middle" dominant-baseline="central">Azure Load Balancer</text>
+
+  <!-- Top arrows -->
+  <line x1="120" y1="55" x2="148" y2="55" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="230" y1="55" x2="258" y2="55" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- AKS Cluster container -->
+  <rect x="180" y="140" width="480" height="300" rx="20" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text class="t-th" fill="#085041" x="200" y="168">AKS Cluster</text>
+
+  <!-- Frontend Pod -->
+  <rect x="220" y="200" width="170" height="60" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text class="t-th" fill="#3C3489" x="305" y="222" text-anchor="middle" dominant-baseline="central">Frontend Pod</text>
+  <text class="t-ts" fill="#534AB7" x="305" y="244" text-anchor="middle" dominant-baseline="central">React + Nginx</text>
+
+  <!-- Backend Service -->
+  <rect x="450" y="200" width="170" height="60" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text class="t-th" fill="#3C3489" x="535" y="222" text-anchor="middle" dominant-baseline="central">Backend Service</text>
+  <text class="t-ts" fill="#534AB7" x="535" y="244" text-anchor="middle" dominant-baseline="central">ClusterIP</text>
+
+  <!-- Backend Pods -->
+  <rect x="450" y="310" width="170" height="60" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text class="t-th" fill="#3C3489" x="535" y="332" text-anchor="middle" dominant-baseline="central">Backend Pods</text>
+  <text class="t-ts" fill="#534AB7" x="535" y="354" text-anchor="middle" dominant-baseline="central">FastAPI × 2</text>
+
+  <!-- PostgreSQL -->
+  <rect x="220" y="310" width="170" height="60" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text class="t-th" fill="#633806" x="305" y="332" text-anchor="middle" dominant-baseline="central">PostgreSQL</text>
+  <text class="t-ts" fill="#854F0B" x="305" y="354" text-anchor="middle" dominant-baseline="central">StatefulSet</text>
+
+  <!-- Ingress to Frontend (L-shape) -->
+  <path d="M 345 86 L 345 180 L 305 180 L 305 198" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <!-- Ingress to Backend Service (L-shape) -->
+  <path d="M 345 86 L 345 180 L 535 180 L 535 198" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+  <!-- Backend Service → Backend Pods -->
+  <line x1="535" y1="260" x2="535" y2="308" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <!-- Backend Pods → PostgreSQL -->
+  <line x1="448" y1="340" x2="392" y2="340" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- GitHub Actions -->
+  <rect x="20" y="180" width="140" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text class="t-th" fill="#2C2C2A" x="90" y="202" text-anchor="middle" dominant-baseline="central">GitHub Actions</text>
+
+  <!-- ACR -->
+  <rect x="20" y="260" width="140" height="60" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text class="t-th" fill="#2C2C2A" x="90" y="282" text-anchor="middle" dominant-baseline="central">Azure Container</text>
+  <text class="t-ts" fill="#5F5E5A" x="90" y="304" text-anchor="middle" dominant-baseline="central">Registry</text>
+
+  <line x1="90" y1="224" x2="90" y2="258" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="160" y1="290" x2="218" y2="290" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text class="t-ts" fill="#5F5E5A" x="189" y="282" text-anchor="middle">image pull</text>
+
+  <!-- Prometheus -->
+  <rect x="180" y="480" width="140" height="44" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+  <text class="t-th" fill="#712B13" x="250" y="502" text-anchor="middle" dominant-baseline="central">Prometheus</text>
+
+  <!-- Azure Monitor -->
+  <rect x="380" y="480" width="180" height="60" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+  <text class="t-th" fill="#712B13" x="470" y="502" text-anchor="middle" dominant-baseline="central">Azure Monitor</text>
+  <text class="t-ts" fill="#993C1D" x="470" y="524" text-anchor="middle" dominant-baseline="central">Container Insights</text>
+
+  <!-- Prometheus scrapes Backend Pods -->
+  <path d="M 250 480 L 250 410 L 535 410 L 535 372" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <text class="t-ts" fill="#5F5E5A" x="395" y="404" text-anchor="middle">scrapes</text>
+
+  <!-- AKS → Azure Monitor -->
+  <path d="M 470 440 L 470 478" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <text class="t-ts" fill="#5F5E5A" x="482" y="462">logs</text>
+</svg>
